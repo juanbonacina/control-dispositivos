@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>Control de dispositivos</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <select id="evSel" aria-label="Evento"></select>
+    <button class="btn2 btn-sm" id="evNew">+ Evento</button>
+    <button class="btn2 btn-sm" id="menuBtn" aria-label="Más opciones">⋯</button>
+  </header>
+
+  <div id="evForm" class="card stack hide">
+    <h2>Nuevo evento</h2>
+    <input id="evName" placeholder="Nombre del evento (ej: Lollapalooza día 1)">
+    <div class="row"><button class="btn2" id="evCancel">Cancelar</button><button class="btn" id="evSave">Crear</button></div>
+  </div>
+
+  <div id="menu" class="card stack hide">
+    <h2>Datos</h2>
+    <button class="btn2" id="expCSV">Descargar CSV del evento</button>
+    <button class="btn2" id="expJSON">Descargar backup completo (JSON)</button>
+    <label class="btn2 filebtn">Restaurar backup (JSON)<input type="file" id="impJSON" accept="application/json,.json" hidden></label>
+    <p class="muted">Los datos se guardan solo en este celular. Descargá el backup al terminar cada evento.</p>
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="entregar" class="on">Entregar</button>
+    <button data-tab="devolver">Devolver</button>
+    <button data-tab="resumen">Resumen</button>
+  </nav>
+  <section id="wizard"></section>
+  <section id="summary" class="hide"></section>
+</div>
+
+<!-- Escáner a pantalla completa -->
+<div id="scanner" class="scanner hide" role="dialog" aria-modal="true">
+  <div class="sc-top"><span id="scTitle">Escanear</span><button class="sc-x" id="scClose" aria-label="Cerrar">✕</button></div>
+  <div class="sc-view">
+    <video id="scVideo" playsinline muted></video>
+    <div class="sc-frame" id="scFrame"></div>
+  </div>
+  <div class="sc-msg" id="scMsg">Apuntá al código</div>
+  <div class="sc-bar">
+    <button class="sc-btn hide" id="scTorch">🔦 Linterna</button>
+    <button class="sc-btn hide" id="scOCR">🔤 Leer texto</button>
+    <label class="sc-btn">📷 Foto<input type="file" id="scFile" accept="image/*" capture="environment" hidden></label>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="js/storage.js" defer></script>
+<script src="js/dni.js" defer></script>
+<script src="js/scanner.js" defer></script>
+<script src="js/app.js" defer></script>
+</body>
+</html>
