@@ -1,14 +1,43 @@
 # Control de dispositivos
 
-Web app mobile para controlar la entrega y devolución de dispositivos en eventos.
+Web app mobile para controlar la entrega y devolución de dispositivos en eventos, compartida entre varios operadores.
 
-- **Entregar:** escaneás el SN del dispositivo → escaneás el DNI de la persona → queda registrado como entregado.
-- **Devolver:** escaneás el SN → escaneás el DNI → si coincide con el de la entrega, se marca como devuelto. Si no coincide, lo rechaza (hay una opción "forzar" que queda registrada).
-- **Resumen:** entregados sin devolver, devueltos, totales, personas con equipo, búsqueda por SN / DNI / nombre.
+- **Entregar:** escaneás el SN del dispositivo → escaneás el DNI de la persona → queda registrado como entregado, con quién lo entregó.
+- **Devolver:** escaneás el SN → escaneás el DNI → si coincide con el de la entrega, se marca como devuelto, con quién lo recibió. Si no coincide, lo rechaza (hay una opción "forzar" que queda registrada).
+- **Resumen:** entregados sin devolver, devueltos, totales, personas con equipo, conteo por operador, búsqueda por SN / DNI / nombre, CSV.
 
-Sin build, sin dependencias para instalar: HTML + CSS + JS plano.
+Frontend estático (HTML + CSS + JS, sin build) en GitHub Pages + base de datos en **Supabase**.
 
-## Lectura
+## Usuarios
+
+Javier, Gastón, Matías, Julieta, Julián y Juan. Cada uno entra eligiendo su nombre y su contraseña; la sesión queda guardada en el celular. Quién entregó y quién recibió lo registra la base (trigger), no el celular, así que no se puede falsear.
+
+Para cambiar la lista: `js/config.js` (`operadores`) y `supabase/crear-usuarios.mjs` (`OPERADORES`).
+
+## Sin señal
+
+Las entregas y devoluciones se guardan al instante en el celular y se envían solas cuando vuelve la conexión (indicador arriba a la derecha: ✓ Sincronizado / ⚠ Sin conexión · N sin enviar). Los cambios de los otros celulares llegan en tiempo real.
+
+Si dos celulares entregan el mismo SN estando sin señal, la base acepta el primero que llega y el otro recibe un aviso: *"No se guardó la entrega de SN…: otro operador ya lo había entregado"*.
+
+El primer ingreso de cada usuario necesita conexión.
+
+## Puesta en marcha (una sola vez)
+
+1. **Crear el proyecto** en [supabase.com](https://supabase.com) (plan Free alcanza).
+2. **Base de datos:** SQL Editor → pegar `supabase/schema.sql` completo → Run.
+3. **Usuarios:** desde tu compu, con Node 18+:
+   ```bash
+   SUPABASE_URL=https://xxxx.supabase.co SUPABASE_SECRET_KEY=sb_secret_xxx node supabase/crear-usuarios.mjs
+   ```
+   Imprime la contraseña de cada uno. Para resetear una sola: `node supabase/crear-usuarios.mjs Julieta`.
+   La clave **secret** es la llave maestra: se usa solo en este comando, nunca va al código.
+4. **Conectar la app:** en `js/config.js` completar `supabaseUrl` y `supabaseKey` con la clave **publishable** (o la `anon`). Esa clave es pública por diseño: los datos los protegen las políticas RLS del schema (sin usuario no se puede leer ni escribir nada).
+5. Commit + push. GitHub Pages publica solo.
+
+Opcional, en Supabase → Authentication → Sign In / Providers: desactivar **Allow new users to sign up**, así nadie más puede crearse una cuenta.
+
+## Lectura de códigos
 
 | Qué | Cómo |
 |---|---|
@@ -17,42 +46,24 @@ Sin build, sin dependencias para instalar: HTML + CSS + JS plano.
 | SN escrito | Botón **🔤 Leer texto** (OCR con Tesseract.js). Siempre verificar. |
 | Sin cámara en vivo | Botón **📷 Foto** dentro del escáner |
 
-Usa `BarcodeDetector` nativo donde existe (Chrome Android) y [ZXing](https://github.com/zxing-js/library) como respaldo (iOS). Linterna disponible en los equipos que la exponen.
-
-## Datos
-
-- Se guardan en el **localStorage del celular** (no hay servidor). Cada evento tiene su propio registro.
-- Menú **⋯** → descargar CSV del evento (abre directo en Excel), backup completo en JSON y restaurar backup.
-- Funciona **offline** después de la primera carga (service worker). El OCR descarga su modelo la primera vez que se usa: usalo una vez con conexión antes del evento.
-- ⚠️ Si se borran los datos del navegador se pierde el registro: descargá el backup al cierre de cada evento.
-
-## Publicar en GitHub Pages
-
-1. Subí el repo a GitHub.
-2. **Settings → Pages → Build and deployment → Source: Deploy from a branch**, branch `main`, carpeta `/ (root)`.
-3. Abrí `https://<usuario>.github.io/<repo>/` en el celular. En Chrome/Safari: "Agregar a pantalla de inicio" para usarla como app.
-
-La cámara **requiere HTTPS** (GitHub Pages ya lo da). En local:
-
-```bash
-python3 -m http.server 8080
-# http://localhost:8080 funciona con cámara en la compu;
-# para probar en el celular por la red local hace falta HTTPS (ej: ngrok, cloudflared).
-```
+Usa `BarcodeDetector` nativo donde existe (Chrome Android) y [ZXing](https://github.com/zxing-js/library) como respaldo (iOS). La cámara requiere HTTPS (GitHub Pages ya lo da).
 
 ## Estructura
 
 ```
-index.html            UI
+index.html
 css/styles.css
-js/app.js             flujo entregar / devolver / resumen
+js/config.js          URL y clave pública de Supabase, lista de operadores
+js/app.js             login, flujo entregar / devolver / resumen
+js/storage.js         Supabase + caché local + cola offline + tiempo real
 js/scanner.js         cámara en vivo, códigos, OCR, foto
 js/dni.js             parser del PDF417 del DNI
-js/storage.js         persistencia (localStorage) — único punto a cambiar para usar un backend
+supabase/schema.sql   tablas, seguridad (RLS), auditoría de operador, tiempo real
+supabase/crear-usuarios.mjs
 sw.js                 cache offline (subir CACHE al cambiar archivos)
 manifest.webmanifest  instalable como app
 ```
 
-## Próximos pasos posibles
+## Datos personales
 
-- Sincronizar varios celulares en el mismo evento: reemplazar `js/storage.js` por Supabase / Firebase manteniendo la misma interfaz.
+La base guarda DNI y nombre de los asistentes. No subas al repo CSV ni exportaciones (el `.gitignore` ya los excluye) y borrá los eventos viejos cuando no se necesiten más (Supabase → Table Editor → `eventos`; borra sus préstamos en cascada).

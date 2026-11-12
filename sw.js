@@ -1,11 +1,12 @@
 /* Service worker: deja la app usable sin conexión (en eventos la señal suele fallar).
    Subí CACHE cada vez que cambies archivos para forzar la actualización. */
-const CACHE = "dc-v1";
+const CACHE = "dc-v2";
 const SHELL = [
-  "./", "index.html", "css/styles.css", "js/app.js", "js/storage.js", "js/dni.js", "js/scanner.js",
+  "./", "index.html", "css/styles.css", "js/app.js", "js/config.js", "js/storage.js", "js/dni.js", "js/scanner.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png",
   "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js",
   "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js",
 ];
 
 self.addEventListener("install", e => {

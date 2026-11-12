@@ -1,0 +1,10 @@
+# Exportaciones con datos personales (DNI, nombres)
+*.csv
+backup-*.json
+
+# Secretos
+.env
+.env.*
+
+node_modules/
+.DS_Store

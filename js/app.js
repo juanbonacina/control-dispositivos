@@ -23,18 +23,17 @@
   /* ---------- Eventos ---------- */
   function renderEventos() {
     const evs = Store.eventos();
-    if (!evs.some(e => e.id === S.evento)) { S.evento = evs[0] ? evs[0].id : ""; pref.set("dc_evento", S.evento); }
+    if (!evs.some(e => e.id === S.evento)) { S.evento = evs[0] ? evs[0].id : ""; pref.set("dc_evento", S.evento); Store.selectEvento(S.evento); }
     $("#evSel").innerHTML = evs.length
       ? evs.map(e => `<option value="${esc(e.id)}"${e.id === S.evento ? " selected" : ""}>${esc(e.nombre)}</option>`).join("")
       : `<option value="">Sin eventos — creá uno</option>`;
-    if (!evs.length) $("#evForm").classList.remove("hide");
   }
-  $("#evSel").onchange = e => { S.evento = e.target.value; pref.set("dc_evento", S.evento); resetFlow(); renderAll(); };
+  $("#evSel").onchange = e => { S.evento = e.target.value; pref.set("dc_evento", S.evento); Store.selectEvento(S.evento); resetFlow(); renderAll(); };
   $("#evNew").onclick = () => { $("#evForm").classList.remove("hide"); $("#menu").classList.add("hide"); $("#evName").focus(); };
-  $("#evCancel").onclick = () => { if (Store.eventos().length) $("#evForm").classList.add("hide"); };
+  $("#evCancel").onclick = () => $("#evForm").classList.add("hide");
   $("#evSave").onclick = () => {
     const n = $("#evName").value.trim(); if (!n) { $("#evName").focus(); return; }
-    S.evento = Store.addEvento(n); pref.set("dc_evento", S.evento);
+    S.evento = Store.addEvento(n); pref.set("dc_evento", S.evento); Store.selectEvento(S.evento);
     $("#evName").value = ""; $("#evForm").classList.add("hide"); resetFlow(); renderAll(); toast("Evento creado");
   };
   $("#evName").onkeydown = e => { if (e.key === "Enter") $("#evSave").click(); };
@@ -53,15 +52,19 @@
     const ev = Store.eventos().find(e => e.id === S.evento); if (!ev) return toast("No hay evento seleccionado");
     const cell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const rows = prestamos().sort((a, b) => (a.entregado || 0) - (b.entregado || 0));
-    const lines = [["Evento", "SN", "DNI", "Nombre", "Estado", "Entregado", "Devuelto", "Forzado"].join(";")]
-      .concat(rows.map(p => [ev.nombre, p.sn, p.dni, p.nombre, p.estado, fmtT(p.entregado), fmtT(p.devuelto), p.forzado ? "sí" : ""].map(cell).join(";")));
+    const lines = [["Evento", "SN", "DNI", "Nombre", "Estado", "Entregado", "Entregó", "Devuelto", "Recibió", "Forzado"].join(";")]
+      .concat(rows.map(p => [ev.nombre, p.sn, p.dni, p.nombre, p.estado, fmtT(p.entregado), p.entregadoPor, fmtT(p.devuelto), p.devueltoPor, p.forzado ? "sí" : ""].map(cell).join(";")));
     download(`${slug(ev.nombre)}-${today()}.csv`, "﻿" + lines.join("\r\n"), "text/csv;charset=utf-8");
   };
-  $("#expJSON").onclick = () => download(`backup-dispositivos-${today()}.json`, JSON.stringify(Store.exportAll(), null, 1), "application/json");
-  $("#impJSON").onchange = async e => {
-    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-    try { const n = Store.importAll(JSON.parse(await f.text())); renderAll(); toast(`Backup restaurado (${n} registros nuevos)`); }
-    catch (err) { toast("Archivo inválido"); }
+  $("#logout").onclick = async () => {
+    const pend = Store.status().pending;
+    if (pend && !S.armLogout) {
+      S.armLogout = true;
+      $("#logoutWarn").innerHTML = `<div class="msg warn">Hay ${pend} cambio(s) sin enviar. Si cerrás sesión ahora se pierden. Tocá de nuevo para cerrar igual.</div>`;
+      return;
+    }
+    S.armLogout = false; $("#logoutWarn").innerHTML = "";
+    await Store.logout(); $("#menu").classList.add("hide"); showLogin();
   };
 
   /* ---------- Flujo ---------- */
@@ -180,6 +183,16 @@
   }
 
   /* ---------- Render: resumen ---------- */
+  function porOperador(all) {
+    const m = new Map();
+    for (const p of all) {
+      const e = p.entregadoPor || "—"; m.set(e, m.get(e) || { e: 0, d: 0 }); m.get(e).e++;
+      if (p.estado === "devuelto") { const d = p.devueltoPor || "—"; m.set(d, m.get(d) || { e: 0, d: 0 }); m.get(d).d++; }
+    }
+    if (!m.size) return "";
+    return `<div class="card"><h2>Por operador</h2><div class="ops-stats">${[...m].sort((a, b) => b[1].e - a[1].e)
+      .map(([n, c]) => `<span><b>${esc(n)}</b> · ${c.e} entregó · ${c.d} recibió</span>`).join("")}</div></div>`;
+  }
   function renderSummary() {
     const el = $("#summary");
     if (S.tab !== "resumen") { el.classList.add("hide"); return; }
@@ -199,6 +212,7 @@
         <div class="stat"><b>${all.length}</b><span>Entregas totales</span></div>
         <div class="stat"><b>${personas}</b><span>Personas con equipo</span></div>
       </div>
+      ${porOperador(all)}
       <div class="card">
         <div class="filters">
           <button data-f="pend" class="${S.filtro === "pend" ? "on" : ""}">Pendientes (${pend.length})</button>
@@ -211,7 +225,9 @@
             <div class="li-main">
               <div class="li-sn">${esc(p.sn)}</div>
               <div>${esc(p.nombre || "Sin nombre")} · DNI ${esc(p.dni || "—")}</div>
-              <div class="li-sub">Entregado ${esc(fmtT(p.entregado))}${p.devuelto ? " · Devuelto " + esc(fmtT(p.devuelto)) : ""}${p.forzado ? " · forzado" : ""}</div>
+              <div class="li-sub">Entregó ${esc(p.entregadoPor || "—")} · ${esc(fmtT(p.entregado))}</div>
+              ${p.devuelto ? `<div class="li-sub">Recibió ${esc(p.devueltoPor || "—")} · ${esc(fmtT(p.devuelto))}${p.forzado ? " · forzado" : ""}</div>` : ""}
+              ${p.pendiente ? `<div class="li-sub">⟳ sin enviar</div>` : ""}
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
               <span class="badge ${p.estado === "entregado" ? "pend" : "dev"}">${p.estado === "entregado" ? "Entregado" : "Devuelto"}</span>
@@ -240,10 +256,54 @@
     renderWizard(); renderSummary();
   };
 
-  function renderAll() { renderEventos(); renderWizard(); renderSummary(); }
-  Store.subscribe(renderSummary);
-  window.addEventListener("storage", renderAll); // otra pestaña
-  renderAll();
+  function renderStatus() {
+    const st = Store.status(), el = $("#sync");
+    el.className = "sync" + (!st.online ? " off" : st.pending ? " pend" : "");
+    el.textContent = !st.online ? `⚠ Sin conexión${st.pending ? ` · ${st.pending} sin enviar` : ""}` : st.pending ? `⟳ Enviando ${st.pending}…` : "✓ Sincronizado";
+    $("#who").textContent = Store.operador ? "👤 " + Store.operador.nombre : "";
+  }
+  $("#sync").onclick = () => { Store.sync(); toast("Sincronizando…"); };
+
+  function renderAll() { renderEventos(); renderWizard(); renderSummary(); renderStatus(); }
+
+  /* ---------- Login ---------- */
+  let loginSel = null;
+  function showLogin() {
+    $("#app").classList.add("hide"); $("#login").classList.remove("hide");
+    $("#ops").innerHTML = APP_CONFIG.operadores.map(n => `<button data-op="${esc(n)}" class="${n === loginSel ? "on" : ""}">${esc(n)}</button>`).join("");
+    $("#pwBox").classList.toggle("hide", !loginSel);
+  }
+  $("#ops").onclick = e => {
+    const b = e.target.closest("[data-op]"); if (!b) return;
+    loginSel = b.dataset.op; $("#loginMsg").innerHTML = ""; showLogin(); $("#pw").focus();
+  };
+  async function doLogin() {
+    const pw = $("#pw").value; if (!loginSel || !pw) return;
+    $("#loginBtn").disabled = true; $("#loginMsg").innerHTML = "";
+    try { await Store.login(loginSel, pw); $("#pw").value = ""; pref.set("dc_ultimo_op", loginSel); startApp(); }
+    catch (err) { $("#loginMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    $("#loginBtn").disabled = false;
+  }
+  $("#loginBtn").onclick = doLogin;
+  $("#pw").onkeydown = e => { if (e.key === "Enter") doLogin(); };
+
+  function startApp() {
+    $("#login").classList.add("hide"); $("#app").classList.remove("hide");
+    Store.start(S.evento);
+    renderAll();
+  }
+
+  Store.subscribe(() => { renderEventos(); renderSummary(); renderStatus(); });
+  Store.onError(msg => {
+    toast(msg); vibrate([120, 80, 120]);
+    if (S.tab !== "resumen") { S.msgSN = { t: "err", m: msg }; if (S.step === "sn") renderWizard(); }
+  });
+
+  (async () => {
+    if (!Store.configured) { $("#setup").classList.remove("hide"); return; }
+    loginSel = pref.get("dc_ultimo_op", null);
+    if (await Store.restoreSession()) startApp(); else showLogin();
+  })();
 
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

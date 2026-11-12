@@ -11,14 +11,34 @@
 <link rel="stylesheet" href="css/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" defer></script>
 </head>
 <body>
 <div class="wrap">
+  <!-- Login -->
+  <section id="login" class="hide">
+    <div class="card stack">
+      <h2>¿Quién sos?</h2>
+      <div class="ops" id="ops"></div>
+      <div id="pwBox" class="stack hide">
+        <input id="pw" type="password" autocomplete="current-password" placeholder="Contraseña">
+        <button class="btn" id="loginBtn">Ingresar</button>
+      </div>
+      <div id="loginMsg"></div>
+    </div>
+  </section>
+  <section id="setup" class="hide">
+    <div class="card stack"><h2>Falta configurar</h2>
+      <p>Completá <code>supabaseUrl</code> y <code>supabaseKey</code> en <code>js/config.js</code>. Ver el README.</p></div>
+  </section>
+
+  <div id="app" class="hide">
   <header>
     <select id="evSel" aria-label="Evento"></select>
     <button class="btn2 btn-sm" id="evNew">+ Evento</button>
     <button class="btn2 btn-sm" id="menuBtn" aria-label="Más opciones">⋯</button>
   </header>
+  <div class="statusbar"><span id="who"></span><button id="sync" class="sync"></button></div>
 
   <div id="evForm" class="card stack hide">
     <h2>Nuevo evento</h2>
@@ -27,11 +47,10 @@
   </div>
 
   <div id="menu" class="card stack hide">
-    <h2>Datos</h2>
+    <h2>Opciones</h2>
     <button class="btn2" id="expCSV">Descargar CSV del evento</button>
-    <button class="btn2" id="expJSON">Descargar backup completo (JSON)</button>
-    <label class="btn2 filebtn">Restaurar backup (JSON)<input type="file" id="impJSON" accept="application/json,.json" hidden></label>
-    <p class="muted">Los datos se guardan solo en este celular. Descargá el backup al terminar cada evento.</p>
+    <button class="btn2" id="logout">Cerrar sesión</button>
+    <div id="logoutWarn"></div>
   </div>
 
   <nav class="tabs" id="tabs">
@@ -41,6 +60,7 @@
   </nav>
   <section id="wizard"></section>
   <section id="summary" class="hide"></section>
+  </div>
 </div>
 
 <!-- Escáner a pantalla completa -->
@@ -60,6 +80,7 @@
 
 <div id="toast"></div>
 
+<script src="js/config.js" defer></script>
 <script src="js/storage.js" defer></script>
 <script src="js/dni.js" defer></script>
 <script src="js/scanner.js" defer></script>
