@@ -5,8 +5,8 @@
      Es pública por diseño: lo que protege los datos son las políticas RLS de supabase/schema.sql.
      NUNCA poner acá la clave secreta / service_role. */
 window.APP_CONFIG = {
-  supabaseUrl: "",
-  supabaseKey: "",
+  supabaseUrl: "https://bdqbnydxxeypyotlxnwk.supabase.co",
+  supabaseKey: "sb_publishable_JxGT-7W1z0iLndlvkqmusA_Xq7IxdbA",
 
   // Dominio ficticio para armar el email interno de cada usuario (javier@<dominio>).
   // Tiene que coincidir con el usado en supabase/crear-usuarios.mjs.

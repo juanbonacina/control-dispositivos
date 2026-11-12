@@ -1,6 +1,6 @@
 /* Service worker: deja la app usable sin conexión (en eventos la señal suele fallar).
    Subí CACHE cada vez que cambies archivos para forzar la actualización. */
-const CACHE = "dc-v2";
+const CACHE = "dc-v3";
 const SHELL = [
   "./", "index.html", "css/styles.css", "js/app.js", "js/config.js", "js/storage.js", "js/dni.js", "js/scanner.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png",
